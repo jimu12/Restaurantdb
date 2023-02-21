@@ -1,0 +1,336 @@
+/****** Object:  UserDefinedFunction [dbo].[DiscountOnFood]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE Function [dbo].[DiscountOnFood](@FID int)
+	Returns decimal(10,2)
+
+As 
+Begin
+		Declare @Price decimal(10,2)
+		Declare @Discount decimal(10,2)
+		Declare @Total decimal(10,2)
+	
+
+		Set @Price=(Select Price From FoodDetails where FoodID=@FID)
+		Set @Discount=(@Price*10/100)
+		Set @Total=@Price + @Price*18/100 - @Discount
+	
+
+	Return @Total
+
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[FinalPrice]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE Function [dbo].[FinalPrice] (@FoodID int)
+Returns decimal(10,2)
+As 
+Begin
+Declare @Price int
+Declare @Discount float
+Declare @Total decimal(10,2)
+Declare @CGST int
+Declare @SGST int
+
+
+Set @Price=(Select Price*Quantity From FoodDetails where FoodID=@FoodID)
+Set @Discount=(Select @Price *5/100)
+Set @CGST=(Select @Price *9/100)
+Set @SGST=(Select @Price *9/100)
+
+Set @Total=(@Price + @CGST + @SGST-@Discount)
+
+Return @Total
+
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[GST_Calculation_2]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE Function [dbo].[GST_Calculation_2] (@FoodID int)
+Returns decimal(10,2)
+
+Begin
+	Declare @Price decimal(10,2)
+	Declare @CGST decimal(10,2)
+	Declare @SGST decimal(10,2)
+	Declare @TotalGST decimal(10,2)
+	Declare @FinalPrice decimal(10,2)
+	Declare @Discount decimal(10,2)
+
+
+	Set @Price=(Select Price*Quantity From FoodDetails where FoodID=@FoodID)
+	Set @CGST=(@Price*5)/100
+	Set @SGST=(@Price*5)/100
+	Set @TotalGST=@CGST+@SGST
+	Set @Price=@Price+@TotalGST
+	Set @Discount=(@Price*10)/100
+	Set @FinalPrice=@Price-@Discount
+
+
+Return @FinalPrice
+
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[GST_Calculation_3]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE Function [dbo].[GST_Calculation_3](@FoodID int)
+Returns @GST_Calc Table
+	(Food_ID int primary key,
+	Price decimal(10,2),
+	CGST decimal(10,2),
+	SGST decimal(10,2),
+	Total_GST decimal (10,2),
+	Price_after_tax decimal (10,2),
+	Discount decimal(10,2),
+	Final_Price decimal(10,2)	
+	
+	)
+	
+Begin
+	Declare @Price decimal(10,2)
+	Declare @CGST decimal(10,2)
+	Declare @SGST decimal(10,2)
+	Declare @Price_after_tax decimal(10,2)
+	Declare @TotalGST decimal(10,2)
+	Declare @FinalPrice decimal(10,2)
+	Declare @Discount decimal(10,2)
+
+	
+	Set @Price=(Select Price*Quantity From FoodDetails where FoodID=@FoodID)
+	Set @CGST=(@Price*5)/100
+	Set @SGST=(@Price*5)/100
+	Set @TotalGST=@CGST+@SGST
+	Set @Price_after_tax=@Price+@TotalGST
+	Set @Discount=(@Price*10)/100
+	Set @FinalPrice=@Price_after_tax-@Discount
+
+
+Insert Into @GST_Calc(Food_ID,Price,CGST,SGST,Total_GST,Price_after_tax,Discount,Final_Price)
+Values(@FoodID,@Price,@CGST,@SGST,@TotalGST,@Price_after_tax,@Discount,@FinalPrice)
+
+Return
+
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[GstCalculator]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE Function [dbo].[GstCalculator](@FoodID int)
+Returns @GSTCalculation Table(
+	GSTID int primary key,
+	Price decimal(10,2),
+	CGST decimal (10,2),
+	SGST decimal(10,2),
+	Total_GST decimal(10,2),
+	AmtBeforeDiscount decimal(10,2),
+	Discount decimal(10,2),
+	FinalAmount decimal(10,2)
+	
+	
+)
+
+As 
+Begin
+Declare @CGST decimal(10,2)
+Declare @SGST decimal(10,2)
+Declare @Total_GST decimal(10,2)
+Declare @Discount decimal (10,2)
+Declare @FinalAmount decimal(10,2)
+Declare @Pricebeforetax decimal(10,2)
+Declare @BeforeDiscount decimal(10,2)
+
+Set @Pricebeforetax=(Select (Price*Quantity) From FoodDetails where FoodID=@FoodID)
+Set @CGST=(Select (Price*Quantity)*0.025 From FoodDetails where FoodID=@FoodID)
+Set @SGST=(Select (Price*Quantity)*0.025 From FoodDetails where FoodID=@FoodID)
+Set @Total_GST= @CGST+@SGST
+Set @BeforeDiscount = @Total_GST + @Pricebeforetax
+Set @Discount =@BeforeDiscount *0.05
+Set @FinalAmount=round(@BeforeDiscount-@Discount,0,1)
+
+
+	Insert Into @GSTCalculation(GSTID,Price,CGST,SGST,Total_GST,AmtBeforeDiscount,Discount,FinalAmount)
+	Values(1,@Pricebeforetax,@CGST,@SGST,@Total_GST,@BeforeDiscount,@Discount,@FinalAmount)
+Return
+
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[Percentage]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE Function [dbo].[Percentage](@Num1 decimal , @Percentage decimal)
+returns decimal(10,2)
+
+As 
+Begin
+	Return ((@Num1 *@Percentage)/100)
+End
+GO
+/****** Object:  UserDefinedFunction [dbo].[Sum1]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+Create Function [dbo].[Sum1](@A int, @B int)
+Returns int
+
+As 
+Begin
+	Return (@A + @B)
+End
+GO
+/****** Object:  Table [dbo].[CustomerMaster]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[CustomerMaster](
+	[CustomerID] [int] IDENTITY(1,1) NOT NULL,
+	[FirstName] [nvarchar](150) NULL,
+	[LastName] [nvarchar](150) NULL,
+	[MobileNumber] [nvarchar](50) NULL,
+	[EmailID] [nvarchar](150) NULL,
+	[Address] [nvarchar](500) NULL,
+	[Area] [nvarchar](150) NULL,
+	[CountryID] [int] NULL,
+	[StateID] [int] NULL,
+	[CityID] [int] NULL,
+	[CreatedBy] [int] NULL,
+	[CreatedOn] [date] NULL,
+	[ModifiedBy] [int] NULL,
+	[ModifiedOn] [date] NULL,
+	[IsActive] [bit] NULL,
+ CONSTRAINT [PK_CustomerDetails] PRIMARY KEY CLUSTERED 
+(
+	[CustomerID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[FoodDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[FoodDetails](
+	[FoodID] [int] IDENTITY(1,1) NOT NULL,
+	[FoodName] [nvarchar](500) NULL,
+	[Price] [decimal](10, 2) NULL,
+	[Quantity] [int] NULL,
+	[OrderID] [int] NULL,
+	[KitchenID] [int] NULL,
+	[IsActive] [bit] NULL,
+ CONSTRAINT [PK_FoodDetails] PRIMARY KEY CLUSTERED 
+(
+	[FoodID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[KitchenDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[KitchenDetails](
+	[KitchenID] [int] IDENTITY(1,1) NOT NULL,
+	[OrderID] [int] NULL,
+	[IsActive] [bit] NULL,
+ CONSTRAINT [PK_KitchenDetails] PRIMARY KEY CLUSTERED 
+(
+	[KitchenID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[OfferDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[OfferDetails](
+	[OfferID] [int] IDENTITY(1,1) NOT NULL,
+	[CustomerID] [int] NULL,
+	[PaymentID] [int] NULL,
+	[TotalDiscount] [decimal](10, 2) NULL,
+ CONSTRAINT [PK_OfferDetails] PRIMARY KEY CLUSTERED 
+(
+	[OfferID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[OrderDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[OrderDetails](
+	[OrderID] [int] IDENTITY(1,1) NOT NULL,
+	[CustomerID] [int] NULL,
+	[FoodID] [int] NULL,
+	[TableID] [int] NULL,
+	[KitchenID] [int] NULL,
+	[Ordertime] [datetime] NULL,
+	[Delieveredtime] [datetime] NULL,
+	[IsActive] [int] NULL,
+ CONSTRAINT [PK_OrderDetails] PRIMARY KEY CLUSTERED 
+(
+	[OrderID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[PaymentDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[PaymentDetails](
+	[PaymentID] [int] IDENTITY(1,1) NOT NULL,
+	[CustomerID] [int] NULL,
+	[TableID] [int] NULL,
+	[TotalBill] [decimal](10, 2) NULL,
+	[TotalDiscount] [decimal](10, 2) NULL,
+	[TotalTax] [decimal](10, 2) NULL,
+	[GrandTotal] [decimal](10, 2) NULL,
+	[PaidAmount] [decimal](10, 2) NULL,
+	[PayDate] [datetime] NULL,
+ CONSTRAINT [PK_PaymentDetails] PRIMARY KEY CLUSTERED 
+(
+	[PaymentID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[TableDetails]    Script Date: 21-02-2023 07:30:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[TableDetails](
+	[TableID] [int] IDENTITY(1,1) NOT NULL,
+	[TableNo] [int] NULL,
+	[CustomerID] [int] NULL,
+	[OrderID] [int] NULL,
+	[KitchenID] [int] NULL,
+	[IsActive] [bit] NULL,
+ CONSTRAINT [PK_Table_Details] PRIMARY KEY CLUSTERED 
+(
+	[TableID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+USE [master]
+GO
+ALTER DATABASE [RestaurantDb] SET  READ_WRITE 
+GO
